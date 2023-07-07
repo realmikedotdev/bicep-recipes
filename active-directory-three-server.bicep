@@ -1,23 +1,33 @@
 // Variables
-var AD01Name = 'pref-AD01'
-var AD02Name = 'pref-AD02'
-var AD03Name = 'pref-AD03'
-var vmSize = 'Standard_Bs'
+
 var vmPublisher = 'MicrosoftWindowsServer'
 var vmOffer = 'WindowsServer'
-var vmSku = '2012-R2-Datacenter'
+var vmSku = '2022-datacenter-azure-edition-core'
 var vmVersion = 'latest'
 var vNetName = 'pref-vNet'
 var nsgName = 'pref-nsg'
 var lawName = 'pref-law'
 
 // Parameters
-param resLocation string = 'eastus'
-param compName string = {}
-param adminUn string = {}
+param vmNames array = [
+  'pref-AD01'
+  'pref-AD02'
+  'pref-AD03'
+]
+param adminUn string
+@minLength(12)
 @secure()
-param adminPwd string = {}
+param adminPwd string
+param dnsLabelPrefix string = toLower('${vmNames}-${uniqueString(resourceGroup().id, 'vmname')}')
+param publicIpName string = 'mgmtPublicIP'
+param publicIPAllocationMethod string = 'Dynamic'
+param publicIpSku string = 'Basic'
+param vmSize string = 'Standard_Bs'
+param resLocation string = resourceGroup().location
+param securityType string = 'TrustedLaunch'
 
+
+// Resources
 resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2020-10-01' = {
   name: lawName
   location: resLocation
@@ -97,9 +107,9 @@ resource networkSecurityGroup 'Microsoft.Network/networkSecurityGroups@2019-11-0
   }
 }
 
-resource networkInterface 'Microsoft.Network/networkInterfaces@2020-11-01' = {
-  name: 'name'
-  location: location
+resource ADVM01NIC 'Microsoft.Network/networkInterfaces@2020-11-01' = {
+  name: 'ADVM01-nic'
+  location: resLocation
   properties: {
     ipConfigurations: [
       {
@@ -107,7 +117,7 @@ resource networkInterface 'Microsoft.Network/networkInterfaces@2020-11-01' = {
         properties: {
           privateIPAllocationMethod: 'Dynamic'
           subnet: {
-            id: 'subnet.id'
+            id: 'ADSubNet'
           }
         }
       }
@@ -115,15 +125,15 @@ resource networkInterface 'Microsoft.Network/networkInterfaces@2020-11-01' = {
   }
 }
 
-resource ADVM01 'Microsoft.Compute/virtualMachines@2020-12-01' = {
-  name: AD01Name
+resource ADVMs 'Microsoft.Compute/virtualMachines@2020-12-01' = [for name in vmNames: {
+  name: '${name}'
   location: resLocation
   properties: {
     hardwareProfile: {
       vmSize: vmSize
     }
     osProfile: {
-      computerName: compName
+      computerName: '${name}'
       adminUsername: adminUn
       adminPassword: adminPwd
     }
@@ -135,7 +145,7 @@ resource ADVM01 'Microsoft.Compute/virtualMachines@2020-12-01' = {
         version: vmVersion
       }
       osDisk: {
-        name: '${AD01Name}-OSDisk'
+        name: '${name}-OSDisk'
         caching: 'ReadWrite'
         createOption: 'FromImage'
       }
@@ -143,7 +153,7 @@ resource ADVM01 'Microsoft.Compute/virtualMachines@2020-12-01' = {
     networkProfile: {
       networkInterfaces: [
         {
-          id: '${AD01Name}-NIC'
+          id: {}
         }
       ]
     }
@@ -154,87 +164,4 @@ resource ADVM01 'Microsoft.Compute/virtualMachines@2020-12-01' = {
       }
     }
   }
-}
-
-resource ADVM02 'Microsoft.Compute/virtualMachines@2020-12-01' = {
-  name: AD02Name
-  location: resLocation
-  properties: {
-    hardwareProfile: {
-      vmSize: vmSize
-    }
-    osProfile: {
-      computerName: compName
-      adminUsername: adminUn
-      adminPassword: adminPwd
-    }
-    storageProfile: {
-      imageReference: {
-        publisher: vmPublisher
-        offer: vmOffer
-        sku: vmSku
-        version: vmVersion
-      }
-      osDisk: {
-        name: '${AD02Name}-OSDisk'
-        caching: 'ReadWrite'
-        createOption: 'FromImage'
-      }
-    }
-    networkProfile: {
-      networkInterfaces: [
-        {
-          id: '${AD02Name}-NIC'
-        }
-      ]
-    }
-    diagnosticsProfile: {
-      bootDiagnostics: {
-        enabled: true
-        storageUri:  'storageUri'
-      }
-    }
-  }
-}
-
-resource ADVM03 'Microsoft.Compute/virtualMachines@2020-12-01' = {
-  name: AD03Name
-  location: resLocation
-  properties: {
-    hardwareProfile: {
-      vmSize: vmSize
-    }
-    osProfile: {
-      computerName: compName
-      adminUsername: adminUn
-      adminPassword: adminPwd
-    }
-    storageProfile: {
-      imageReference: {
-        publisher: vmPublisher
-        offer: vmOffer
-        sku: vmSku
-        version: vmVersion
-      }
-      osDisk: {
-        name: '${AD03Name}-OSDisk'
-        caching: 'ReadWrite'
-        createOption: 'FromImage'
-      }
-    }
-    networkProfile: {
-      networkInterfaces: [
-        {
-          id: '${AD03Name}-NIC'
-        }
-      ]
-    }
-    diagnosticsProfile: {
-      bootDiagnostics: {
-        enabled: true
-        storageUri:  'storageUri'
-      }
-    }
-  }
-}
-
+}]

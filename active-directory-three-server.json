@@ -1,0 +1,214 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.18.4.5664",
+      "templateHash": "159448123466056389"
+    }
+  },
+  "parameters": {
+    "vmNames": {
+      "type": "array",
+      "defaultValue": [
+        "pref-AD01",
+        "pref-AD02",
+        "pref-AD03"
+      ]
+    },
+    "adminUn": {
+      "type": "string"
+    },
+    "adminPwd": {
+      "type": "securestring",
+      "minLength": 12
+    },
+    "dnsLabelPrefix": {
+      "type": "string",
+      "defaultValue": "[toLower(format('{0}-{1}', parameters('vmNames'), uniqueString(resourceGroup().id, 'vmname')))]"
+    },
+    "publicIpName": {
+      "type": "string",
+      "defaultValue": "mgmtPublicIP"
+    },
+    "publicIPAllocationMethod": {
+      "type": "string",
+      "defaultValue": "Dynamic"
+    },
+    "publicIpSku": {
+      "type": "string",
+      "defaultValue": "Basic"
+    },
+    "vmSize": {
+      "type": "string",
+      "defaultValue": "Standard_Bs"
+    },
+    "resLocation": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]"
+    },
+    "securityType": {
+      "type": "string",
+      "defaultValue": "TrustedLaunch"
+    }
+  },
+  "variables": {
+    "vmPublisher": "MicrosoftWindowsServer",
+    "vmOffer": "WindowsServer",
+    "vmSku": "2022-datacenter-azure-edition-core",
+    "vmVersion": "latest",
+    "vNetName": "pref-vNet",
+    "nsgName": "pref-nsg",
+    "lawName": "pref-law"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces",
+      "apiVersion": "2020-10-01",
+      "name": "[variables('lawName')]",
+      "location": "[parameters('resLocation')]",
+      "properties": {
+        "sku": {
+          "name": "Free"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Network/virtualNetworks",
+      "apiVersion": "2019-11-01",
+      "name": "[variables('vNetName')]",
+      "location": "[parameters('resLocation')]",
+      "properties": {
+        "addressSpace": {
+          "addressPrefixes": [
+            "10.10.0.0/16"
+          ]
+        },
+        "subnets": [
+          {
+            "name": "ADSubNet",
+            "properties": {
+              "addressPrefix": "10.10.0.0/24"
+            }
+          },
+          {
+            "name": "WebNet",
+            "properties": {
+              "addressPrefix": "10.10.1.0/24"
+            }
+          },
+          {
+            "name": "MgmtNet",
+            "properties": {
+              "addressPrefix": "10.10.10.0/24"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "apiVersion": "2019-11-01",
+      "name": "[variables('nsgName')]",
+      "location": "[parameters('resLocation')]",
+      "properties": {
+        "securityRules": [
+          {
+            "name": "ssh",
+            "properties": {
+              "description": "SSH Access",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "22",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 110,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "rdp",
+            "properties": {
+              "description": "RDP Access",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "3389",
+              "sourceAddressPrefix": "10.10.0.0/24,10.10.10.0/24",
+              "destinationAddressPrefix": "10.10.0.0/24,10.10.10.0/24",
+              "access": "Allow",
+              "priority": 111,
+              "direction": "Inbound"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Network/networkInterfaces",
+      "apiVersion": "2020-11-01",
+      "name": "ADVM01-nic",
+      "location": "[parameters('resLocation')]",
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "name",
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "subnet": {
+                "id": "ADSubNet"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "copy": {
+        "name": "ADVMs",
+        "count": "[length(parameters('vmNames'))]"
+      },
+      "type": "Microsoft.Compute/virtualMachines",
+      "apiVersion": "2020-12-01",
+      "name": "[format('{0}', parameters('vmNames')[copyIndex()])]",
+      "location": "[parameters('resLocation')]",
+      "properties": {
+        "hardwareProfile": {
+          "vmSize": "[parameters('vmSize')]"
+        },
+        "osProfile": {
+          "computerName": "[format('{0}', parameters('vmNames')[copyIndex()])]",
+          "adminUsername": "[parameters('adminUn')]",
+          "adminPassword": "[parameters('adminPwd')]"
+        },
+        "storageProfile": {
+          "imageReference": {
+            "publisher": "[variables('vmPublisher')]",
+            "offer": "[variables('vmOffer')]",
+            "sku": "[variables('vmSku')]",
+            "version": "[variables('vmVersion')]"
+          },
+          "osDisk": {
+            "name": "[format('{0}-OSDisk', parameters('vmNames')[copyIndex()])]",
+            "caching": "ReadWrite",
+            "createOption": "FromImage"
+          }
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": {}
+            }
+          ]
+        },
+        "diagnosticsProfile": {
+          "bootDiagnostics": {
+            "enabled": true,
+            "storageUri": "storageUri"
+          }
+        }
+      }
+    }
+  ]
+}
