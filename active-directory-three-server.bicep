@@ -9,11 +9,12 @@ var nsgName = 'pref-nsg'
 var lawName = 'pref-law'
 
 // Parameters
-param vmNames array = [
+param ADVMNames array = [
   'pref-AD01'
   'pref-AD02'
   'pref-AD03'
 ]
+param mgmtVMName string = 'pref-ADMgmt'
 param adminUn string
 @minLength(12)
 @secure()
@@ -25,6 +26,7 @@ param publicIpSku string = 'Basic'
 param vmSize string = 'Standard_Bs'
 param resLocation string = resourceGroup().location
 param securityType string = 'TrustedLaunch'
+
 
 
 // Resources
@@ -125,7 +127,7 @@ resource ADVM01NIC 'Microsoft.Network/networkInterfaces@2020-11-01' = {
   }
 }
 
-resource ADVMs 'Microsoft.Compute/virtualMachines@2020-12-01' = [for name in vmNames: {
+resource ADVMs 'Microsoft.Compute/virtualMachines@2020-12-01' = [for name in ADVMNames: {
   name: '${name}'
   location: resLocation
   properties: {
@@ -165,3 +167,44 @@ resource ADVMs 'Microsoft.Compute/virtualMachines@2020-12-01' = [for name in vmN
     }
   }
 }]
+
+resource mgmtVM 'Microsoft.Compute/virtualMachines@2020-12-01' = {
+  name: mgmtVMName
+  location: resLocation
+  properties: {
+    hardwareProfile: {
+      vmSize: vmSize
+    }
+    osProfile: {
+      computerName: mgmtVMName
+      adminUsername: adminUn
+      adminPassword: adminPwd
+    }
+    storageProfile: {
+      imageReference: {
+        publisher: vmPublisher
+        offer: vmOffer
+        sku: vmSku
+        version: vmVersion
+      }
+      osDisk: {
+        name: '${mgmtVMName}-OSDisk'
+        caching: 'ReadWrite'
+        createOption: 'FromImage'
+      }
+    }
+    networkProfile: {
+      networkInterfaces: [
+        {
+          id: {}
+        }
+      ]
+    }
+    diagnosticsProfile: {
+      bootDiagnostics: {
+        enabled: true
+        storageUri:  'storageUri'
+      }
+    }
+  }
+}
